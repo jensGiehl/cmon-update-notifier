@@ -18,7 +18,7 @@ einer **dateibasierten H2-Datenbank** gespeichert.
   „Last Updated“-Datum löst keine Nachricht aus. Entfernte Spiele werden gemeldet.
   Für neu auftauchende Spiele oder zusätzliche Schritte wird zunächst still ein Ausgangsstand gespeichert.
 - Layout, Skripte, Bilddatei-URLs, Footer und die Reihenfolge der Projekte erzeugen keine Meldungen.
-- Ohne bekannten vorherigen Status wird **immer nur der Ausgangsstand gespeichert**.
+- Ohne bekannten vorherigen Status wird für den Änderungsvergleich **nur der Ausgangsstand gespeichert**.
   Der erste Start erzeugt keine Änderungsmeldung, weder über Telegram noch über den
   Logging-Ausgabekanal. Erst ein späterer Wechsel eines bekannten Status oder Liefertermins
   löst eine Benachrichtigung aus. Die frühere Option `--monitor.notify-on-first-run` und
@@ -43,6 +43,39 @@ einer **dateibasierten H2-Datenbank** gespeichert.
   bestehen bleiben; entscheidend ist die Betriebssystem-Sperre während des laufenden Prozesses.
 - Lange Telegram-Meldungen werden aufgeteilt; jeder Teil enthält den Webseitenlink.
   Projektnamen werden als Klartext versendet.
+
+## Sonntägliche Aktivitätsmeldung
+
+Bei konfiguriertem Telegram versendet die Anwendung beim ersten erfolgreichen Seitenabruf
+am **Sonntag ab 10:00 Uhr in Europe/Berlin** eine zusätzliche Meldung, dass sie weiterhin
+aktiv ist. Sommer- und Winterzeit werden automatisch berücksichtigt. Die Meldung enthält
+für Crowdfunding und Pre-order alle Projekte mit mindestens einem Schritt `In progress`
+und nennt sämtliche aktuell laufenden Schritte. Projekte ohne laufende Schritte werden
+nicht angezeigt. Sind keine Projekte in Arbeit, wird trotzdem eine kurze Aktivitätsmeldung
+gesendet. Diese Meldung erfolgt auch beim ersten Start oder ohne Statusänderungen.
+
+```text
+CMON Update ist weiterhin aktiv — Sonntagsstatus
+https://www.cmon.com/project-status/
+
+[Crowdfunding] Mordred: In progress — Pledge Packing
+[Pre-order] Beispielspiel: In progress — Mass Production, Proofing Files
+```
+
+Das Versanddatum wird nach erfolgreichem Versand aller Teile in H2 unter
+`weekly_status_notification` gespeichert. Die Flyway-Migration
+`V2__create_weekly_status.sql` ergänzt diese Tabelle automatisch und erhält vorhandene
+Projektstatus. Weitere Aufrufe am selben Sonntag senden keine zweite Aktivitätsmeldung,
+auch nach Neustarts oder einem Containerwechsel mit demselben Datenverzeichnis.
+Am nächsten Sonntag kann wieder eine Meldung gesendet werden. Ohne Telegram wird kein
+Versanddatum gespeichert. Versandfehler werden bei einem weiteren Lauf am selben Sonntag
+ab 10 Uhr erneut versucht. Verpasste Sonntage werden nicht nachträglich gemeldet.
+
+Die vorhandene Dateisperre schützt auch diese Prüfung und den Versand. Wie bei
+Änderungsmeldungen kann ein Prozessabbruch zwischen Telegram-Bestätigung und H2-Speicherung
+oder ein Fehler in einem späteren Nachrichtenteil zu einer Wiederholung führen.
+Cron muss die Anwendung sonntags ab 10 Uhr ausführen; die bestehenden stündlichen
+Cron-Beispiele erfüllen das. Im Docker-Betrieb muss `/data` dauerhaft eingebunden bleiben.
 
 Die SQL-Migrationen liegen in `src/main/resources/db/migration`. Bei einer neuen Datenbank
 legt `V1__create_project_status.sql` die Tabellen an. Bereits vorhandene H2-Datenbanken aus
@@ -120,7 +153,8 @@ java -jar target/cmon-update.jar --help
 
 Die Tests prüfen Parser, Änderungen, Flyway-Migrationen für neue und vorhandene H2-Datenbanken,
 H2-Persistenz nach erneuten Aufrufen,
-Transaktions-Rollback, konkurrierende Prüfungen, Logging-Ausgaben ohne Telegram und die HTTP-Kommunikation über lokale
+Transaktions-Rollback, konkurrierende Prüfungen, die Sonntagsmeldung einschließlich
+Zeitgrenze, Sommer-/Winterzeit, Neustarts und Versandfehlern, Logging-Ausgaben ohne Telegram und die HTTP-Kommunikation über lokale
 Testendpunkte. Sie senden keine echten Telegram-Nachrichten.
 
 ## Telegram und Konfiguration

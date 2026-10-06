@@ -15,15 +15,17 @@ public class MonitorService {
     private final StateStore store;
     private final ChangeFormatter formatter;
     private final Notifier notifier;
+    private final WeeklyStatusService weeklyStatus;
 
     public MonitorService(MonitorProperties properties, PageSource source, ProjectStatusParser parser,
-                          StateStore store, ChangeFormatter formatter, Notifier notifier) {
+                          StateStore store, ChangeFormatter formatter, Notifier notifier, WeeklyStatusService weeklyStatus) {
         this.properties = properties;
         this.source = source;
         this.parser = parser;
         this.store = store;
         this.formatter = formatter;
         this.notifier = notifier;
+        this.weeklyStatus = weeklyStatus;
     }
 
     public void check() throws InterruptedException {
@@ -62,6 +64,7 @@ public class MonitorService {
                     LOG.info("{}: keine Änderungsmeldung; aktueller Seitenstand gespeichert.", section.label());
                 }
             }
+            weeklyStatus.sendIfDue(current);
             if (failed) {
                 throw new MonitorException("Mindestens eine Änderungsmeldung konnte nicht ausgegeben werden;"
                         + " die betroffenen Änderungen werden beim nächsten Cron-Lauf erneut versucht.");

@@ -10,6 +10,7 @@ import java.nio.file.StandardOpenOption;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.time.LocalDate;
 import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -99,6 +100,28 @@ public class StateStore {
             }
         } catch (SQLException exception) {
             throw new MonitorException("H2-Stand kann nicht gespeichert werden. Die Änderung wird beim nächsten Cron-Lauf erneut versucht.");
+        }
+    }
+
+    public boolean weeklyStatusSent(LocalDate date) {
+        try (var connection = connect();
+             var statement = connection.prepareStatement("SELECT sent_on FROM weekly_status_notification WHERE sent_on = ?")) {
+            statement.setObject(1, date);
+            try (var rows = statement.executeQuery()) {
+                return rows.next();
+            }
+        } catch (SQLException exception) {
+            throw new MonitorException("H2-Versanddatum der Sonntagsmeldung kann nicht gelesen werden.");
+        }
+    }
+
+    public void markWeeklyStatusSent(LocalDate date) {
+        try (var connection = connect();
+             var statement = connection.prepareStatement("INSERT INTO weekly_status_notification (sent_on) VALUES (?)")) {
+            statement.setObject(1, date);
+            statement.executeUpdate();
+        } catch (SQLException exception) {
+            throw new MonitorException("H2-Versanddatum der Sonntagsmeldung kann nicht gespeichert werden.");
         }
     }
 

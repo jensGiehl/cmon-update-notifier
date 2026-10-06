@@ -7,7 +7,10 @@ import java.net.InetSocketAddress;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -19,8 +22,11 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.boot.SpringApplication;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
 import org.jsoup.Jsoup;
 import tools.jackson.databind.json.JsonMapper;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -164,7 +170,7 @@ class HttpIntegrationTest {
 
     @Test
     void rejectsRemovedWatchOptionWithoutCreatingDatabase() {
-        try (var context = SpringApplication.run(CmonUpdateApplication.class, arguments("--watch"))) {
+        try (var context = application().run(arguments("--watch"))) {
             assertThat(SpringApplication.exit(context)).isEqualTo(1);
             assertThat(directory.resolve("cmon-state.mv.db")).doesNotExist();
             assertThat(requests).isEmpty();
@@ -173,15 +179,28 @@ class HttpIntegrationTest {
 
     @Test
     void invalidConfigurationFailsBeforeFetching() {
-        try (var context = SpringApplication.run(CmonUpdateApplication.class, arguments("--monitor.request-timeout=0s"))) {
+        try (var context = application().run(arguments("--monitor.request-timeout=0s"))) {
             assertThat(SpringApplication.exit(context)).isEqualTo(1);
             assertThat(directory.resolve("cmon-state.mv.db")).doesNotExist();
         }
     }
 
     private int runApplication(String... extra) {
-        try (var context = SpringApplication.run(CmonUpdateApplication.class, arguments(extra))) {
+        try (var context = application().run(arguments(extra))) {
             return SpringApplication.exit(context);
+        }
+    }
+
+    private SpringApplication application() {
+        return new SpringApplication(CmonUpdateApplication.class, TestClockConfiguration.class);
+    }
+
+    @TestConfiguration(proxyBeanMethods = false)
+    static class TestClockConfiguration {
+        @Bean
+        @Primary
+        Clock testClock() {
+            return Clock.fixed(Instant.parse("2026-10-06T08:00:00Z"), ZoneId.of("Europe/Berlin"));
         }
     }
 

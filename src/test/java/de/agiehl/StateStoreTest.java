@@ -28,12 +28,17 @@ class StateStoreTest {
              var statement = connection.createStatement();
              var rows = statement.executeQuery("""
                      SELECT "version", "type", "script", "checksum", "success" FROM "flyway_schema_history"
-                     WHERE "type" = 'SQL'
+                     WHERE "type" = 'SQL' ORDER BY "installed_rank"
                      """)) {
             assertThat(rows.next()).isTrue();
             assertThat(rows.getString("version")).isEqualTo("1");
             assertThat(rows.getString("type")).isEqualTo("SQL");
             assertThat(rows.getString("script")).isEqualTo("V1__create_project_status.sql");
+            assertThat(rows.getObject("checksum")).isNotNull();
+            assertThat(rows.getBoolean("success")).isTrue();
+            assertThat(rows.next()).isTrue();
+            assertThat(rows.getString("version")).isEqualTo("2");
+            assertThat(rows.getString("script")).isEqualTo("V2__create_weekly_status.sql");
             assertThat(rows.getObject("checksum")).isNotNull();
             assertThat(rows.getBoolean("success")).isTrue();
             assertThat(rows.next()).isFalse();

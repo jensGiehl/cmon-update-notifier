@@ -2,9 +2,14 @@ package de.agiehl;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.jsoup.Jsoup;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -136,7 +141,91 @@ class MonitorServiceTest {
         }
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"2026-10-11T07:59:59Z", "2026-10-10T09:00:00Z", "2026-10-12T09:00:00Z"})
+    void doesNotSendWeeklyStatusBeforeSundayTenOrOnOtherDays(String instant) throws Exception {
+        var properties = TestFixtures.properties(directory);
+        var messages = new ArrayList<String>();
+        var html = TestFixtures.html();
+
+        service(properties, new StateStore(properties), () -> html, messages::add, instant).check();
+
+        assertThat(messages).isEmpty();
+    }
+
+    @Test
+    void sendsWeeklyStatusOnFirstSundayRunAndOnlyOnceAcrossRestarts() throws Exception {
+        var properties = TestFixtures.properties(directory);
+        var html = TestFixtures.html();
+        var messages = new ArrayList<String>();
+        service(properties, new StateStore(properties), () -> html, messages::add, "2026-10-11T08:00:00Z").check();
+        assertThat(messages).singleElement().asString()
+                .contains("weiterhin aktiv", "Test & Spiel 🎲", "Development", "Pre-order Game", "Shipping")
+                .doesNotContain("Mordred");
+
+        service(properties, new StateStore(properties), () -> html, messages::add, "2026-10-11T21:59:59Z").check();
+        assertThat(messages).hasSize(1);
+        service(properties, new StateStore(properties), () -> html, messages::add, "2026-10-18T08:00:00Z").check();
+        assertThat(messages).hasSize(2);
+    }
+
+    @Test
+    void usesBerlinWinterTimeForSundayDeadline() throws Exception {
+        var properties = TestFixtures.properties(directory);
+        var html = TestFixtures.html();
+        var messages = new ArrayList<String>();
+        service(properties, new StateStore(properties), () -> html, messages::add, "2026-10-25T08:59:59Z").check();
+        assertThat(messages).isEmpty();
+        service(properties, new StateStore(properties), () -> html, messages::add, "2026-10-25T09:00:00Z").check();
+        assertThat(messages).hasSize(1);
+    }
+
+    @Test
+    void retriesFailedWeeklyStatusOnSameSundayWithoutRepeatingChanges() throws Exception {
+        var properties = TestFixtures.properties(directory);
+        var html = TestFixtures.html();
+        var messages = new ArrayList<String>();
+        service(properties, new StateStore(properties), () -> html, messages::add).check();
+        var changed = html.replace("2027 Q1", "2027 Q2");
+
+        assertThatThrownBy(() -> service(properties, new StateStore(properties), () -> changed, message -> {
+            if (message.contains("weiterhin aktiv")) {
+                throw new MonitorException("Telegram unavailable");
+            }
+            messages.add(message);
+        }, "2026-10-11T08:00:00Z").check()).isInstanceOf(MonitorException.class);
+        assertThat(messages).singleElement().asString().contains("expected delivery changed");
+
+        service(properties, new StateStore(properties), () -> changed, messages::add, "2026-10-11T09:00:00Z").check();
+        assertThat(messages).hasSize(2);
+        assertThat(messages.getLast()).contains("weiterhin aktiv");
+        service(properties, new StateStore(properties), () -> changed, messages::add, "2026-10-11T10:00:00Z").check();
+        assertThat(messages).hasSize(2);
+    }
+
+    @Test
+    void doesNotConsumeSundayNotificationWhenTelegramIsNotConfigured() throws Exception {
+        var configured = TestFixtures.properties(directory);
+        var properties = new MonitorProperties(configured.pageUrl(), configured.databasePath(),
+                configured.requestTimeout(), null);
+        var html = TestFixtures.html();
+        var messages = new ArrayList<String>();
+
+        service(properties, new StateStore(properties), () -> html, messages::add, "2026-10-11T08:00:00Z").check();
+        assertThat(messages).isEmpty();
+        service(configured, new StateStore(configured), () -> html, messages::add, "2026-10-11T09:00:00Z").check();
+        assertThat(messages).hasSize(1);
+    }
+
     private MonitorService service(MonitorProperties properties, StateStore store, PageSource source, Notifier notifier) {
-        return new MonitorService(properties, source, new ProjectStatusParser(), store, new ChangeFormatter(), notifier);
+        return service(properties, store, source, notifier, "2026-10-06T08:00:00Z");
+    }
+
+    private MonitorService service(MonitorProperties properties, StateStore store, PageSource source, Notifier notifier,
+                                   String instant) {
+        var clock = Clock.fixed(Instant.parse(instant), ZoneId.of("Europe/Berlin"));
+        var weeklyStatus = new WeeklyStatusService(properties, store, new WeeklyStatusFormatter(), notifier, clock);
+        return new MonitorService(properties, source, new ProjectStatusParser(), store, new ChangeFormatter(), notifier,
+                weeklyStatus);
     }
 }

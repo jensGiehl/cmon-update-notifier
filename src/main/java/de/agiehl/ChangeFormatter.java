@@ -11,8 +11,6 @@ import org.springframework.stereotype.Component;
 @Component
 public class ChangeFormatter {
 
-    private static final int MESSAGE_LIMIT = 4000;
-
     public List<String> messages(Section section, SectionSnapshot previous, SectionSnapshot current, URI pageUrl) {
         if (previous == null) {
             return List.of();
@@ -41,37 +39,7 @@ public class ChangeFormatter {
         }
         var header = "CMON " + section.label() + " — Änderungen"
                 + "\n" + section.link(pageUrl) + "\n\n";
-        if (header.length() > MESSAGE_LIMIT / 2) {
-            throw new MonitorException("CMON_PAGE_URL ist zu lang für eine Telegram-Nachricht.");
-        }
-        var messages = new ArrayList<String>();
-        var buffer = new StringBuilder(header);
-        for (var change : changes) {
-            var remaining = change + "\n";
-            while (!remaining.isEmpty()) {
-                int available = MESSAGE_LIMIT - buffer.length();
-                if (available == 0) {
-                    messages.add(buffer.toString().stripTrailing());
-                    buffer = new StringBuilder(header);
-                    available = MESSAGE_LIMIT - buffer.length();
-                }
-                int end = Math.min(available, remaining.length());
-                if (end < remaining.length() && Character.isHighSurrogate(remaining.charAt(end - 1))) {
-                    end--;
-                }
-                if (end == 0) {
-                    messages.add(buffer.toString().stripTrailing());
-                    buffer = new StringBuilder(header);
-                    continue;
-                }
-                buffer.append(remaining, 0, end);
-                remaining = remaining.substring(end);
-            }
-        }
-        if (buffer.length() > header.length()) {
-            messages.add(buffer.toString().stripTrailing());
-        }
-        return List.copyOf(messages);
+        return TelegramMessages.split(header, changes);
     }
 
     private String describeChange(String game, String stage, String before, String after) {
