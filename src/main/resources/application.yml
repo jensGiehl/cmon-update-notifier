@@ -1,0 +1,21 @@
+spring:
+  main:
+    banner-mode: off
+    web-application-type: none
+  application:
+    name: cmon-update
+logging:
+  charset:
+    console: UTF-8
+    file: UTF-8
+  level:
+    root: WARN
+    de.agiehl: INFO
+monitor:
+  page-url: ${CMON_PAGE_URL:https://www.cmon.com/project-status/}
+  database-path: ${CMON_DATABASE_PATH:./data/cmon-state}
+  request-timeout: ${CMON_REQUEST_TIMEOUT:30s}
+  telegram:
+    bot-token: ${TELEGRAM_BOT_TOKEN:}
+    chat-id: ${TELEGRAM_CHAT_ID:}
+    api-url: ${TELEGRAM_API_URL:https://api.telegram.org/}

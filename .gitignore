@@ -1,0 +1,11 @@
+/target/
+/data/
+/.idea/
+/.tools/
+*.iml
+.env
+telegram.env
+cmon-page.html
+*.mv.db
+*.trace.db
+*.run.lock

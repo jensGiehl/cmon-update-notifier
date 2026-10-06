@@ -1,0 +1,14 @@
+.git
+.github
+.idea
+.tools
+target
+data
+*.env
+.env
+*.iml
+cmon-page.html
+README.md
+**/*.mv.db
+**/*.trace.db
+**/*.run.lock
