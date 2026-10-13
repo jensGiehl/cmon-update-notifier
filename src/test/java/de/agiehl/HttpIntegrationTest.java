@@ -13,6 +13,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -76,6 +77,7 @@ class HttpIntegrationTest {
         assertThat(requests).hasSize(1);
         var request = JsonMapper.builder().build().readTree(requests.getFirst());
         assertThat(request.path("chat_id").asString()).isEqualTo("123");
+        assertThat(request.has("entities")).isFalse();
         assertThat(request.path("text").asString())
                 .contains("#pre-order", "Pre-order Game expected delivery changed: 2027 Q1 → 2027 Q2");
         assertThat(runApplication()).isZero();
@@ -136,6 +138,34 @@ class HttpIntegrationTest {
                 .doesNotContain("secret-bad-token");
         assertThat(requests).isEmpty();
         assertThat(directory.resolve("cmon-state.mv.db")).doesNotExist();
+    }
+
+    @Test
+    void sendsWeeklyStatusWithBoldProjectTitlesAndLiteralSpecialCharacters() throws Exception {
+        var name = "Spiel 🎲 & <Deluxe> [Edition]_2026*";
+        var snapshot = new SectionSnapshot("today", Map.of(name, Map.of("Shipping", "In progress")));
+        var notifier = new TelegramNotifier(properties(), JsonMapper.builder().build());
+        var messages = new WeeklyStatusFormatter().messages(Map.of(
+                Section.CROWDFUNDING, snapshot, Section.PRE_ORDER, snapshot), properties().pageUrl());
+
+        for (var message : messages) {
+            notifier.send(message);
+        }
+
+        assertThat(requests).hasSize(1);
+        var request = JsonMapper.builder().build().readTree(requests.getFirst());
+        var text = request.path("text").asString();
+        assertThat(text).contains(name + "\nShipping\n\n" + name + "\nShipping")
+                .doesNotContain("[Crowdfunding]", "[Pre-order]");
+        assertThat(request.has("parse_mode")).isFalse();
+        assertThat(request.path("entities").size()).isEqualTo(2);
+        for (var entity : request.path("entities")) {
+            assertThat(entity.path("type").asString()).isEqualTo("bold");
+            int offset = entity.path("offset").asInt();
+            int length = entity.path("length").asInt();
+            assertThat(length).isEqualTo(name.length());
+            assertThat(text.substring(offset, offset + length)).isEqualTo(name);
+        }
     }
 
     @Test

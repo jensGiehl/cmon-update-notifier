@@ -10,9 +10,10 @@ import org.springframework.stereotype.Component;
 @Component
 public class WeeklyStatusFormatter {
 
-    public List<String> messages(Map<Section, SectionSnapshot> current, URI pageUrl) {
+    public List<TelegramMessage> messages(Map<Section, SectionSnapshot> current, URI pageUrl) {
         var header = "CMON Update ist weiterhin aktiv — Sonntagsstatus\n" + pageUrl + "\n\n";
-        var projects = new ArrayList<String>();
+        var body = new StringBuilder();
+        var entities = new ArrayList<TelegramMessage.Entity>();
         for (var section : Section.values()) {
             current.get(section).projects().forEach((name, stages) -> {
                 var progress = stages.entrySet().stream()
@@ -21,13 +22,14 @@ public class WeeklyStatusFormatter {
                         .map(Map.Entry::getKey)
                         .collect(Collectors.joining(", "));
                 if (!progress.isEmpty()) {
-                    projects.add("[" + section.label() + "] " + name + ": In progress — " + progress);
+                    entities.add(new TelegramMessage.Entity("bold", body.length(), name.length()));
+                    body.append(name).append('\n').append(progress).append("\n\n");
                 }
             });
         }
-        if (projects.isEmpty()) {
-            projects.add("Aktuell sind keine Projekte in progress.");
+        if (body.isEmpty()) {
+            body.append("Aktuell sind keine Projekte in progress.");
         }
-        return TelegramMessages.split(header, projects);
+        return TelegramMessages.split(header, new TelegramMessage(body.toString().stripTrailing(), entities));
     }
 }

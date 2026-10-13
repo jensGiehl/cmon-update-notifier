@@ -51,16 +51,23 @@ am **Sonntag ab 10:00 Uhr in Europe/Berlin** eine zusätzliche Meldung, dass sie
 aktiv ist. Sommer- und Winterzeit werden automatisch berücksichtigt. Die Meldung enthält
 für Crowdfunding und Pre-order alle Projekte mit mindestens einem Schritt `In progress`
 und nennt sämtliche aktuell laufenden Schritte. Projekte ohne laufende Schritte werden
-nicht angezeigt. Sind keine Projekte in Arbeit, wird trotzdem eine kurze Aktivitätsmeldung
+nicht angezeigt. Projektnamen erscheinen **fett**, darunter stehen ausschließlich die
+laufenden Schritte. Zwischen Projekten steht eine Leerzeile; Abschnittspräfixe wie
+`[Crowdfunding]` entfallen. Sind keine Projekte in Arbeit, wird trotzdem eine kurze Aktivitätsmeldung
 gesendet. Diese Meldung erfolgt auch beim ersten Start oder ohne Statusänderungen.
 
-```text
 CMON Update ist weiterhin aktiv — Sonntagsstatus
-https://www.cmon.com/project-status/
+[Projektstatus](https://www.cmon.com/project-status/)
 
-[Crowdfunding] Mordred: In progress — Pledge Packing
-[Pre-order] Beispielspiel: In progress — Mass Production, Proofing Files
-```
+**Mordred**<br>
+Pledge Packing
+
+**Beispielspiel**<br>
+Mass Production, Proofing Files
+
+Telegram erhält die Fettschrift als Formatierungsinformation. Sonderzeichen und Emojis
+in Projektnamen bleiben erhalten. Bei langen Meldungen wird die Formatierung auch in
+weiteren Nachrichtenteilen beibehalten.
 
 Das Versanddatum wird nach erfolgreichem Versand aller Teile in H2 unter
 `weekly_status_notification` gespeichert. Die Flyway-Migration

@@ -6,6 +6,8 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -21,11 +23,22 @@ public class TelegramNotifier implements Notifier {
 
     @Override
     public void send(String message) throws InterruptedException {
+        send(new TelegramMessage(message, List.of()));
+    }
+
+    @Override
+    public void send(TelegramMessage message) throws InterruptedException {
         var telegram = properties.telegram();
         var base = telegram.apiUrl().toString().replaceAll("/+$", "");
         var endpoint = URI.create(base + "/bot" + telegram.botToken() + "/sendMessage");
-        var body = jsonMapper.writeValueAsString(Map.of("chat_id", telegram.chatId(), "text", message,
-                "link_preview_options", Map.of("is_disabled", true)));
+        var payload = new LinkedHashMap<String, Object>();
+        payload.put("chat_id", telegram.chatId());
+        payload.put("text", message.text());
+        payload.put("link_preview_options", Map.of("is_disabled", true));
+        if (!message.entities().isEmpty()) {
+            payload.put("entities", message.entities());
+        }
+        var body = jsonMapper.writeValueAsString(payload);
         try (var client = HttpClient.newBuilder().connectTimeout(properties.requestTimeout()).build()) {
             var request = HttpRequest.newBuilder(endpoint).timeout(properties.requestTimeout())
                     .header("Content-Type", "application/json; charset=utf-8")
