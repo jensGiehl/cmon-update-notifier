@@ -15,17 +15,23 @@ public class WeeklyStatusFormatter {
         var body = new StringBuilder();
         var entities = new ArrayList<TelegramMessage.Entity>();
         for (var section : Section.values()) {
-            current.get(section).projects().forEach((name, stages) -> {
-                var progress = stages.entrySet().stream()
+            boolean sectionStarted = false;
+            for (var project : current.get(section).projects().entrySet()) {
+                var progress = project.getValue().entrySet().stream()
                         .filter(entry -> !"Delivery".equalsIgnoreCase(entry.getKey()))
                         .filter(entry -> "In progress".equalsIgnoreCase(entry.getValue().strip()))
                         .map(Map.Entry::getKey)
                         .collect(Collectors.joining(", "));
                 if (!progress.isEmpty()) {
+                    if (!sectionStarted) {
+                        body.append(section.label()).append('\n').append(section.link(pageUrl)).append('\n');
+                        sectionStarted = true;
+                    }
+                    var name = project.getKey();
                     entities.add(new TelegramMessage.Entity("bold", body.length(), name.length()));
                     body.append(name).append('\n').append(progress).append("\n\n");
                 }
-            });
+            }
         }
         if (body.isEmpty()) {
             body.append("Aktuell sind keine Projekte in progress.");

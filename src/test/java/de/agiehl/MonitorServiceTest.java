@@ -6,6 +6,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -167,6 +168,51 @@ class MonitorServiceTest {
         assertThat(messages).hasSize(1);
         service(properties, new StateStore(properties), () -> html, messages::add, "2026-10-18T08:00:00Z").check();
         assertThat(messages).hasSize(2);
+    }
+
+    @Test
+    void includesActivePreordersInSundayStatusAndDoesNotResendAfterRestart() throws Exception {
+        var properties = TestFixtures.properties(directory);
+        var document = Jsoup.parse(TestFixtures.html());
+        var preorders = document.getElementById("pre-order");
+        var names = preorders.selectFirst("ul").empty();
+        var headers = preorders.selectFirst("thead tr").empty();
+        var rows = preorders.selectFirst("tbody").empty();
+        var stages = List.of("Development", "Art & Graphics", "Sculpt", "Molding", "Proofing Files",
+                "Mass Production", "Pledge Packing", "Shipping");
+        stages.forEach(stage -> headers.appendElement("th").appendElement("img").attr("alt", stage));
+        headers.appendElement("th").appendElement("img").attr("alt", "Delivery");
+        record Preorder(String name, List<String> statuses, String delivery) {}
+        var projects = List.of(
+                new Preorder("The Adventurers", List.of("Completed", "Completed", "Completed", "Completed",
+                        "Completed", "Completed", "Completed", "In progress"), "2026 Q4"),
+                new Preorder("Super Fantasy Brawl Reborn", List.of("Completed", "In progress", "Completed",
+                        "In progress", "In progress", "Not started", "Not started", "Not started"), "2027 Q2"),
+                new Preorder("The Dead Keep", List.of("Completed", "Completed", "Completed", "Completed",
+                        "Completed", "Not started", "Not started", "Not started"), "2027 Q1"),
+                new Preorder("Cthulhu: Dark Providence", List.of("Completed", "Completed", "Completed", "Completed",
+                        "Completed", "Completed", "Completed", "Completed"), "2026 Q1"));
+        for (var project : projects) {
+            names.appendElement("li").appendElement("h3").addClass("cps-projects__name").text(project.name());
+            var row = rows.appendElement("tr");
+            project.statuses().forEach(status -> row.appendElement("td").appendElement("figure")
+                    .appendElement("img").attr("alt", status));
+            row.appendElement("td").text(project.delivery());
+        }
+        var messages = new ArrayList<String>();
+
+        service(properties, new StateStore(properties), document::outerHtml, messages::add,
+                "2026-10-25T09:00:00Z").check();
+
+        assertThat(messages).singleElement().asString()
+                .contains("Pre-order\n" + Section.PRE_ORDER.link(TestFixtures.PAGE),
+                        "The Adventurers\nShipping", "Super Fantasy Brawl Reborn\nArt & Graphics, Molding, Proofing Files")
+                .doesNotContain("The Dead Keep", "Cthulhu: Dark Providence", "Not started", "Completed");
+
+        service(properties, new StateStore(properties), document::outerHtml, messages::add,
+                "2026-10-25T20:00:00Z").check();
+
+        assertThat(messages).hasSize(1);
     }
 
     @Test

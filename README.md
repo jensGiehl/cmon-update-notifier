@@ -52,18 +52,26 @@ aktiv ist. Sommer- und Winterzeit werden automatisch berücksichtigt. Die Meldun
 für Crowdfunding und Pre-order alle Projekte mit mindestens einem Schritt `In progress`
 und nennt sämtliche aktuell laufenden Schritte. Projekte ohne laufende Schritte werden
 nicht angezeigt. Projektnamen erscheinen **fett**, darunter stehen ausschließlich die
-laufenden Schritte. Zwischen Projekten steht eine Leerzeile; Abschnittspräfixe wie
-`[Crowdfunding]` entfallen. Sind keine Projekte in Arbeit, wird trotzdem eine kurze Aktivitätsmeldung
+laufenden Schritte. Crowdfunding und Pre-order erscheinen als eigene Abschnitte mit
+Überschrift und direktem Link zum jeweiligen Bereich der CMON-Seite. Auch bei Preorders
+erscheinen ausschließlich Projekte mit laufenden Schritten; abgeschlossene oder wartende
+Preorders werden nicht aufgeführt. Abschnitte ohne aktive Projekte entfallen.
+Zwischen Projekten steht eine Leerzeile; Abschnittspräfixe wie `[Crowdfunding]` vor
+einzelnen Projektnamen entfallen. Sind keine Projekte in Arbeit, wird trotzdem eine kurze Aktivitätsmeldung
 gesendet. Diese Meldung erfolgt auch beim ersten Start oder ohne Statusänderungen.
 
 CMON Update ist weiterhin aktiv — Sonntagsstatus
 [Projektstatus](https://www.cmon.com/project-status/)
 
+Crowdfunding<br>
+[Crowdfunding-Projektstatus](https://www.cmon.com/project-status/#crowdfunding)<br>
 **Mordred**<br>
 Pledge Packing
 
-**Beispielspiel**<br>
-Mass Production, Proofing Files
+Pre-order<br>
+[Preorder-Projektstatus](https://www.cmon.com/project-status/#pre-order)<br>
+**Super Fantasy Brawl Reborn**<br>
+Art & Graphics, Molding, Proofing Files
 
 Telegram erhält die Fettschrift als Formatierungsinformation. Sonderzeichen und Emojis
 in Projektnamen bleiben erhalten. Bei langen Meldungen wird die Formatierung auch in

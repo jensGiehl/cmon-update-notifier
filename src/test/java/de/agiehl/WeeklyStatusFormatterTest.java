@@ -22,7 +22,9 @@ class WeeklyStatusFormatterTest {
         var messages = formatter.messages(current, TestFixtures.PAGE);
         assertThat(messages).extracting(TelegramMessage::text).singleElement().asString()
                 .contains("weiterhin aktiv", TestFixtures.PAGE.toString(),
-                        "Active 🎲\nMolding, Proofing Files\n\nPre-order active\nShipping")
+                        "Crowdfunding\n" + Section.CROWDFUNDING.link(TestFixtures.PAGE),
+                        "Active 🎲\nMolding, Proofing Files\n\nPre-order\n"
+                                + Section.PRE_ORDER.link(TestFixtures.PAGE) + "\nPre-order active\nShipping")
                 .doesNotContain("[Crowdfunding]", "[Pre-order]", "Finished", "Waiting", "Not started", "Completed", "2027 Q1");
         var message = messages.getFirst();
         assertThat(message.entities()).allSatisfy(entity -> assertThat(entity.type()).isEqualTo("bold"))
@@ -31,20 +33,44 @@ class WeeklyStatusFormatterTest {
     }
 
     @Test
+    void listsActivePreordersEvenWhenCrowdfundingHasNoActiveProjects() {
+        var current = Map.of(
+                Section.CROWDFUNDING, new SectionSnapshot("today", Map.of(
+                        "Crowdfunding waiting", Map.of("Molding", "Not started"))),
+                Section.PRE_ORDER, new SectionSnapshot("today", Map.of(
+                        "Active preorder 🎲", Map.of("Molding", "In progress", "Shipping", "In progress",
+                                "Delivery", "2027 Q2"),
+                        "Preorder finished", Map.of("Shipping", "Completed"),
+                        "Preorder waiting", Map.of("Molding", "Not started"))));
+
+        var message = formatter.messages(current, TestFixtures.PAGE).getFirst();
+
+        assertThat(message.text()).contains("Pre-order\n" + Section.PRE_ORDER.link(TestFixtures.PAGE)
+                        + "\nActive preorder 🎲\nMolding, Shipping")
+                .doesNotContain("Crowdfunding", "Preorder finished", "Preorder waiting", "2027 Q2");
+        assertThat(message.entities()).singleElement().satisfies(entity ->
+                assertThat(message.text().substring(entity.offset(), entity.offset() + entity.length()))
+                        .isEqualTo("Active preorder 🎲"));
+    }
+
+    @Test
     void sendsActivityConfirmationEvenWhenNoProjectIsInProgress() {
         var snapshot = new SectionSnapshot("today", Map.of("Finished", Map.of("Shipping", "Completed")));
 
         assertThat(formatter.messages(Map.of(Section.CROWDFUNDING, snapshot, Section.PRE_ORDER, snapshot),
                 TestFixtures.PAGE)).extracting(TelegramMessage::text).singleElement().asString()
-                .contains("weiterhin aktiv", "keine Projekte in progress").doesNotContain("Finished");
+                .contains("weiterhin aktiv", "keine Projekte in progress")
+                .doesNotContain("Finished", "Crowdfunding", "Pre-order", "#crowdfunding", "#pre-order");
     }
 
     @Test
     void splitsLongStatusIntoTelegramSizedPartsWithActivityConfirmationAndLink() {
         var snapshot = new SectionSnapshot("today", Map.of("Long 🎲".repeat(1000), Map.of("Shipping", "In progress")));
+        var messages = formatter.messages(Map.of(Section.CROWDFUNDING, snapshot, Section.PRE_ORDER, snapshot),
+                TestFixtures.PAGE);
 
-        assertThat(formatter.messages(Map.of(Section.CROWDFUNDING, snapshot, Section.PRE_ORDER, snapshot),
-                TestFixtures.PAGE)).hasSizeGreaterThan(1).allSatisfy(part -> {
+        assertThat(messages.getFirst().entities()).isNotEmpty();
+        assertThat(messages).hasSizeGreaterThan(1).allSatisfy(part -> {
                     var message = part.text();
                     assertThat(message.length()).isLessThanOrEqualTo(4000);
                     assertThat(message).contains("weiterhin aktiv", TestFixtures.PAGE.toString());

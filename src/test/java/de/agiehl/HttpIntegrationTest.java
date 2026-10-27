@@ -155,7 +155,9 @@ class HttpIntegrationTest {
         assertThat(requests).hasSize(1);
         var request = JsonMapper.builder().build().readTree(requests.getFirst());
         var text = request.path("text").asString();
-        assertThat(text).contains(name + "\nShipping\n\n" + name + "\nShipping")
+        assertThat(text).contains("Crowdfunding\n" + Section.CROWDFUNDING.link(properties().pageUrl())
+                        + "\n" + name + "\nShipping\n\nPre-order\n"
+                        + Section.PRE_ORDER.link(properties().pageUrl()) + "\n" + name + "\nShipping")
                 .doesNotContain("[Crowdfunding]", "[Pre-order]");
         assertThat(request.has("parse_mode")).isFalse();
         assertThat(request.path("entities").size()).isEqualTo(2);
