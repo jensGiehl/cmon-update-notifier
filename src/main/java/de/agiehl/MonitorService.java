@@ -48,7 +48,8 @@ public class MonitorService {
                 }
                 boolean messagesSent = false;
                 try {
-                    for (var message : formatter.messages(section, previous, snapshot, properties.pageUrl())) {
+                    for (var message : formatter.messages(section, previous, snapshot, properties.pageUrl(),
+                            properties::isRelevantTitle)) {
                         notifier.send(message);
                         messagesSent = true;
                     }
@@ -75,6 +76,9 @@ public class MonitorService {
     private void logCurrentStatus(Section section, SectionSnapshot snapshot) {
         LOG.info("{}: aktueller Webseitenstand (Last Updated: {}).", section.label(), snapshot.lastUpdated());
         snapshot.projects().forEach((game, stages) -> {
+            if (!properties.isRelevantTitle(game)) {
+                return;
+            }
             var status = stages.entrySet().stream().map(entry -> entry.getKey() + "=" + entry.getValue())
                     .collect(Collectors.joining("; "));
             LOG.info("Projektstatus [{}] {}: {}", section.label(), game, status);

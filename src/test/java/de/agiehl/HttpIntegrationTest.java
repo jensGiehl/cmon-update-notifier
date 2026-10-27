@@ -12,6 +12,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -22,12 +23,15 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
+import org.springframework.core.env.StandardEnvironment;
+import org.springframework.core.env.SystemEnvironmentPropertySource;
 import org.jsoup.Jsoup;
 import tools.jackson.databind.json.JsonMapper;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -62,6 +66,69 @@ class HttpIntegrationTest {
     @AfterEach
     void stopServer() {
         server.stop(0);
+    }
+
+    @Test
+    void usesRequestedDefaultTitlesWhenSelectionIsNotOverridden() {
+        var options = Arrays.stream(arguments())
+                .filter(option -> !option.startsWith("--monitor.interested-titles="))
+                .toArray(String[]::new);
+
+        try (var context = application().run(options)) {
+            assertThat(context.getBean(MonitorProperties.class).interestedTitles()).containsExactly(
+                    "The Dead Keep", "Mordred", "Masters of the Universe: The Board Game - Clash for Eternia",
+                    "DCeased", "Massive Darkness: Dungeons of Shadowreach");
+            assertThat(SpringApplication.exit(context)).isZero();
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", ", , ", "Mordred,DCeased"})
+    void bindsSelectionFromEnvironmentIncludingExplicitlyEmptyValue(String selection) {
+        var environment = new StandardEnvironment();
+        environment.getPropertySources().addFirst(new SystemEnvironmentPropertySource("testSelection",
+                Map.of("CMON_INTERESTED_TITLES", selection)));
+        var application = application();
+        application.setEnvironment(environment);
+        var options = Arrays.stream(arguments())
+                .filter(option -> !option.startsWith("--monitor.interested-titles="))
+                .toArray(String[]::new);
+
+        try (var context = application.run(options)) {
+            var properties = context.getBean(MonitorProperties.class);
+            if (selection.contains("Mordred")) {
+                assertThat(properties.interestedTitles()).containsExactly("Mordred", "DCeased");
+                assertThat(properties.isRelevantTitle("Other title")).isFalse();
+            } else {
+                assertThat(properties.interestedTitles()).isEmpty();
+                assertThat(properties.isRelevantTitle("Other title")).isTrue();
+            }
+            assertThat(SpringApplication.exit(context)).isZero();
+        }
+    }
+
+    @Test
+    void selectedTitlesRestrictUpdatesAndStatusLogsWhileKeepingCompleteState(CapturedOutput output) {
+        var selection = "--monitor.interested-titles= mordRED , ,DCeased";
+        assertThat(runApplication(selection)).isZero();
+        html = html.replace("2026</span> <span>Q4", "2027</span> <span>Q2")
+                .replace("2027 Q1", "2027 Q2");
+
+        assertThat(runApplication(selection)).isZero();
+
+        assertThat(requests).singleElement().asString().contains("Mordred expected delivery changed")
+                .doesNotContain("Pre-order Game", "Test & Spiel");
+        assertThat(output.getAll()).contains("Projektstatus [Crowdfunding] Mordred:")
+                .doesNotContain("Projektstatus [Pre-order] Pre-order Game:", "Projektstatus [Crowdfunding] Test & Spiel");
+        assertThat(new StateStore(properties()).load().get(Section.PRE_ORDER).projects().get("Pre-order Game"))
+                .containsEntry("Delivery", "2027 Q2");
+        assertThat(runApplication("--monitor.interested-titles=Pre-order Game")).isZero();
+        assertThat(requests).hasSize(1);
+        html = html.replace("2027 Q2", "2027 Q3");
+        assertThat(runApplication("--monitor.interested-titles=Pre-order Game")).isZero();
+        assertThat(requests).hasSize(2);
+        assertThat(requests.getLast()).contains("Pre-order Game expected delivery changed")
+                .doesNotContain("Mordred");
     }
 
     @Test
@@ -146,7 +213,7 @@ class HttpIntegrationTest {
         var snapshot = new SectionSnapshot("today", Map.of(name, Map.of("Shipping", "In progress")));
         var notifier = new TelegramNotifier(properties(), JsonMapper.builder().build());
         var messages = new WeeklyStatusFormatter().messages(Map.of(
-                Section.CROWDFUNDING, snapshot, Section.PRE_ORDER, snapshot), properties().pageUrl());
+                Section.CROWDFUNDING, snapshot, Section.PRE_ORDER, snapshot), properties().pageUrl(), title -> true);
 
         for (var message : messages) {
             notifier.send(message);
@@ -239,6 +306,7 @@ class HttpIntegrationTest {
     private String[] arguments(String... extra) {
         var arguments = new ArrayList<>(List.of("--monitor.page-url=" + base.resolve("project-status/"),
                 "--monitor.database-path=" + directory.resolve("cmon-state"),
+                "--monitor.interested-titles=",
                 "--monitor.telegram.api-url=" + base,
                 "--monitor.telegram.bot-token=123:test-token", "--monitor.telegram.chat-id=123"));
         for (var option : extra) {
@@ -252,7 +320,7 @@ class HttpIntegrationTest {
     private MonitorProperties properties() {
         return new MonitorProperties(base.resolve("project-status/"), directory.resolve("cmon-state"),
                 Duration.ofSeconds(2),
-                new MonitorProperties.Telegram("123:test-token", "123", base));
+                new MonitorProperties.Telegram("123:test-token", "123", base), List.of());
     }
 
     private void respond(HttpExchange exchange, int status, String body) throws IOException {

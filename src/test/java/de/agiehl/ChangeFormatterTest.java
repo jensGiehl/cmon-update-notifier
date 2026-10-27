@@ -9,13 +9,31 @@ class ChangeFormatterTest {
     private final ChangeFormatter formatter = new ChangeFormatter();
 
     @Test
+    void onlyReportsChangesAndRemovalsForSelectedTitles() {
+        var previous = new SectionSnapshot("old", Map.of(
+                "Mordred", Map.of("Shipping", "Not started"),
+                "DCeased", Map.of("Shipping", "In progress"),
+                "Ignored", Map.of("Shipping", "In progress"),
+                "Ignored removal", Map.of("Shipping", "Completed")));
+        var current = new SectionSnapshot("new", Map.of(
+                "Mordred", Map.of("Shipping", "In progress"),
+                "Ignored", Map.of("Shipping", "Completed")));
+
+        assertThat(formatter.messages(Section.CROWDFUNDING, previous, current, TestFixtures.PAGE,
+                title -> title.equals("Mordred") || title.equals("DCeased")))
+                .singleElement().asString()
+                .contains("Mordred start progress", "DCeased removed from project status")
+                .doesNotContain("Ignored");
+    }
+
+    @Test
     void reportsKnownChangesAndRemovalsButInitializesNewGameSilently() {
         var previous = new SectionSnapshot("old", Map.of("Changed", Map.of("Shipping", "Not started"),
                 "Removed", Map.of("Shipping", "Completed")));
         var current = new SectionSnapshot("new", Map.of("Changed", Map.of("Shipping", "In progress"),
                 "Added", Map.of("Delivery", "2027 Q1")));
 
-        assertThat(String.join("\n", formatter.messages(Section.PRE_ORDER, previous, current, TestFixtures.PAGE)))
+        assertThat(String.join("\n", formatter.messages(Section.PRE_ORDER, previous, current, TestFixtures.PAGE, title -> true)))
                 .contains("#pre-order", "Changed start progress \"Shipping\"",
                         "Removed removed from project status")
                 .doesNotContain("Added", "old → new");
@@ -25,7 +43,7 @@ class ChangeFormatterTest {
     void neverNotifiesWithoutPreviousSnapshot() {
         var current = new SectionSnapshot("today", Map.of("Mordred", Map.of("Shipping", "In progress")));
 
-        assertThat(formatter.messages(Section.CROWDFUNDING, null, current, TestFixtures.PAGE)).isEmpty();
+        assertThat(formatter.messages(Section.CROWDFUNDING, null, current, TestFixtures.PAGE, title -> true)).isEmpty();
     }
 
     @Test
@@ -34,7 +52,7 @@ class ChangeFormatterTest {
         var current = new SectionSnapshot("new", Map.of("Mordred", Map.of(
                 "Shipping", "In progress", "Proofing Files", "Completed", "Delivery", "2026 Q4")));
 
-        assertThat(formatter.messages(Section.CROWDFUNDING, previous, current, TestFixtures.PAGE)).isEmpty();
+        assertThat(formatter.messages(Section.CROWDFUNDING, previous, current, TestFixtures.PAGE, title -> true)).isEmpty();
     }
 
     @Test
@@ -46,7 +64,7 @@ class ChangeFormatterTest {
                 "Mass Production", "Completed", "Pledge Packing", "Completed",
                 "Shipping", "In progress", "Delivery", "2026 Q4")));
 
-        assertThat(formatter.messages(Section.CROWDFUNDING, previous, current, TestFixtures.PAGE))
+        assertThat(formatter.messages(Section.CROWDFUNDING, previous, current, TestFixtures.PAGE, title -> true))
                 .singleElement().asString()
                 .contains("Mordred finished \"Pledge Packing\"", "Mordred start progress \"Shipping\"", "#crowdfunding")
                 .doesNotContain("Mass Production", "expected delivery", "old", "new");
@@ -60,7 +78,7 @@ class ChangeFormatterTest {
         var current = new SectionSnapshot("new", Map.of(
                 "DCeased", Map.of("Delivery", "2027 Q1"), "Dune: Desert War", dune));
 
-        assertThat(formatter.messages(Section.CROWDFUNDING, previous, current, TestFixtures.PAGE))
+        assertThat(formatter.messages(Section.CROWDFUNDING, previous, current, TestFixtures.PAGE, title -> true))
                 .singleElement().asString().contains("DCeased expected delivery changed: 2026 Q4 → 2027 Q1")
                 .doesNotContain("Dune: Desert War", "finished \"Delivery\"");
     }
@@ -70,7 +88,7 @@ class ChangeFormatterTest {
         var projects = Map.of("Mordred", Map.of("Pledge Packing", "In progress", "Delivery", "2026 Q4"));
 
         assertThat(formatter.messages(Section.CROWDFUNDING, new SectionSnapshot("old", projects),
-                new SectionSnapshot("new", projects), TestFixtures.PAGE)).isEmpty();
+                new SectionSnapshot("new", projects), TestFixtures.PAGE, title -> true)).isEmpty();
     }
 
     @Test
@@ -80,7 +98,7 @@ class ChangeFormatterTest {
         var current = new SectionSnapshot("new", Map.of("Mordred", Map.of(
                 "Shipping", "Not started", "Proofing Files", "On hold")));
 
-        assertThat(formatter.messages(Section.CROWDFUNDING, previous, current, TestFixtures.PAGE))
+        assertThat(formatter.messages(Section.CROWDFUNDING, previous, current, TestFixtures.PAGE, title -> true))
                 .singleElement().asString()
                 .contains("Mordred — \"Shipping\": In progress → Not started",
                         "Mordred — \"Proofing Files\": Completed → On hold");
@@ -92,7 +110,7 @@ class ChangeFormatterTest {
         var previous = new SectionSnapshot("yesterday", Map.of(game, Map.of("Delivery", "2026 Q4")));
         var current = new SectionSnapshot("today", Map.of(game, Map.of("Delivery", "2027 Q1")));
 
-        var messages = formatter.messages(Section.CROWDFUNDING, previous, current, TestFixtures.PAGE);
+        var messages = formatter.messages(Section.CROWDFUNDING, previous, current, TestFixtures.PAGE, title -> true);
 
         assertThat(messages).hasSizeGreaterThan(1).allSatisfy(message -> {
             assertThat(message.length()).isLessThanOrEqualTo(4000);

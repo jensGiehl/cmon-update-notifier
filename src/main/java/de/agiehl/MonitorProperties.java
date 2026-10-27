@@ -3,11 +3,27 @@ package de.agiehl;
 import java.net.URI;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.List;
+import java.util.Objects;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties("monitor")
 public record MonitorProperties(URI pageUrl, Path databasePath,
-                                Duration requestTimeout, Telegram telegram) {
+                                Duration requestTimeout, Telegram telegram, List<String> interestedTitles) {
+
+    public MonitorProperties {
+        interestedTitles = interestedTitles == null ? List.of() : interestedTitles.stream()
+                .filter(Objects::nonNull)
+                .map(String::strip)
+                .filter(title -> !title.isEmpty())
+                .distinct()
+                .toList();
+    }
+
+    public boolean isRelevantTitle(String title) {
+        return interestedTitles.isEmpty()
+                || interestedTitles.stream().anyMatch(selected -> selected.equalsIgnoreCase(title.strip()));
+    }
 
     public void validate() {
         validateHttpUrl(pageUrl, "CMON_PAGE_URL");

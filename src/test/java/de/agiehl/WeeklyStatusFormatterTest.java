@@ -19,7 +19,7 @@ class WeeklyStatusFormatterTest {
                 Section.PRE_ORDER, new SectionSnapshot("today", Map.of(
                         "Pre-order active", Map.of("Shipping", " in PROGRESS "))));
 
-        var messages = formatter.messages(current, TestFixtures.PAGE);
+        var messages = formatter.messages(current, TestFixtures.PAGE, title -> true);
         assertThat(messages).extracting(TelegramMessage::text).singleElement().asString()
                 .contains("weiterhin aktiv", TestFixtures.PAGE.toString(),
                         "Crowdfunding\n" + Section.CROWDFUNDING.link(TestFixtures.PAGE),
@@ -43,7 +43,7 @@ class WeeklyStatusFormatterTest {
                         "Preorder finished", Map.of("Shipping", "Completed"),
                         "Preorder waiting", Map.of("Molding", "Not started"))));
 
-        var message = formatter.messages(current, TestFixtures.PAGE).getFirst();
+        var message = formatter.messages(current, TestFixtures.PAGE, title -> true).getFirst();
 
         assertThat(message.text()).contains("Pre-order\n" + Section.PRE_ORDER.link(TestFixtures.PAGE)
                         + "\nActive preorder 🎲\nMolding, Shipping")
@@ -58,7 +58,7 @@ class WeeklyStatusFormatterTest {
         var snapshot = new SectionSnapshot("today", Map.of("Finished", Map.of("Shipping", "Completed")));
 
         assertThat(formatter.messages(Map.of(Section.CROWDFUNDING, snapshot, Section.PRE_ORDER, snapshot),
-                TestFixtures.PAGE)).extracting(TelegramMessage::text).singleElement().asString()
+                TestFixtures.PAGE, title -> true)).extracting(TelegramMessage::text).singleElement().asString()
                 .contains("weiterhin aktiv", "keine Projekte in progress")
                 .doesNotContain("Finished", "Crowdfunding", "Pre-order", "#crowdfunding", "#pre-order");
     }
@@ -67,7 +67,7 @@ class WeeklyStatusFormatterTest {
     void splitsLongStatusIntoTelegramSizedPartsWithActivityConfirmationAndLink() {
         var snapshot = new SectionSnapshot("today", Map.of("Long 🎲".repeat(1000), Map.of("Shipping", "In progress")));
         var messages = formatter.messages(Map.of(Section.CROWDFUNDING, snapshot, Section.PRE_ORDER, snapshot),
-                TestFixtures.PAGE);
+                TestFixtures.PAGE, title -> true);
 
         assertThat(messages.getFirst().entities()).isNotEmpty();
         assertThat(messages).hasSizeGreaterThan(1).allSatisfy(part -> {

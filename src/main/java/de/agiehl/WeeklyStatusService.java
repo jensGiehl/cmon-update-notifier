@@ -35,7 +35,7 @@ public class WeeklyStatusService {
                 || store.weeklyStatusSent(now.toLocalDate())) {
             return;
         }
-        for (var message : formatter.messages(current, properties.pageUrl())) {
+        for (var message : formatter.messages(current, properties.pageUrl(), properties::isRelevantTitle)) {
             notifier.send(message);
         }
         store.markWeeklyStatusSent(now.toLocalDate());

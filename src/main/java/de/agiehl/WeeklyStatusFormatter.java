@@ -4,19 +4,24 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 
 @Component
 public class WeeklyStatusFormatter {
 
-    public List<TelegramMessage> messages(Map<Section, SectionSnapshot> current, URI pageUrl) {
+    public List<TelegramMessage> messages(Map<Section, SectionSnapshot> current, URI pageUrl,
+                                           Predicate<String> relevantTitle) {
         var header = "CMON Update ist weiterhin aktiv — Sonntagsstatus\n" + pageUrl + "\n\n";
         var body = new StringBuilder();
         var entities = new ArrayList<TelegramMessage.Entity>();
         for (var section : Section.values()) {
             boolean sectionStarted = false;
             for (var project : current.get(section).projects().entrySet()) {
+                if (!relevantTitle.test(project.getKey())) {
+                    continue;
+                }
                 var progress = project.getValue().entrySet().stream()
                         .filter(entry -> !"Delivery".equalsIgnoreCase(entry.getKey()))
                         .filter(entry -> "In progress".equalsIgnoreCase(entry.getValue().strip()))

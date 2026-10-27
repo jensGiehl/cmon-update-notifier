@@ -15,6 +15,7 @@ monitor:
   page-url: ${CMON_PAGE_URL:https://www.cmon.com/project-status/}
   database-path: ${CMON_DATABASE_PATH:./data/cmon-state}
   request-timeout: ${CMON_REQUEST_TIMEOUT:30s}
+  interested-titles: '${CMON_INTERESTED_TITLES:The Dead Keep,Mordred,Masters of the Universe: The Board Game - Clash for Eternia,DCeased,Massive Darkness: Dungeons of Shadowreach}'
   telegram:
     bot-token: ${TELEGRAM_BOT_TOKEN:}
     chat-id: ${TELEGRAM_CHAT_ID:}

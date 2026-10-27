@@ -6,12 +6,14 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.TreeSet;
+import java.util.function.Predicate;
 import org.springframework.stereotype.Component;
 
 @Component
 public class ChangeFormatter {
 
-    public List<String> messages(Section section, SectionSnapshot previous, SectionSnapshot current, URI pageUrl) {
+    public List<String> messages(Section section, SectionSnapshot previous, SectionSnapshot current, URI pageUrl,
+                                 Predicate<String> relevantTitle) {
         if (previous == null) {
             return List.of();
         }
@@ -20,6 +22,9 @@ public class ChangeFormatter {
         var names = new TreeSet<>(oldProjects.keySet());
         names.addAll(current.projects().keySet());
         for (var name : names) {
+            if (!relevantTitle.test(name)) {
+                continue;
+            }
             var before = oldProjects.get(name);
             var after = current.projects().get(name);
             if (after == null) {

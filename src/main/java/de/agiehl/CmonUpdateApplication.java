@@ -24,6 +24,8 @@ public class CmonUpdateApplication {
                     Optional: TELEGRAM_BOT_TOKEN und TELEGRAM_CHAT_ID
                     Ohne vollständige Telegram-Einstellungen werden Updates im Log ausgegeben.
                     Optionen: --monitor.database-path=./data/cmon-state
+                    Titelauswahl: --monitor.interested-titles="Mordred,DCeased"
+                    Leere Titelauswahl berücksichtigt alle Titel; Standard: fünf Titel laut README.
                     Der erste Stand wird gespeichert und nicht als Änderungsmeldung ausgegeben.
                     Zeitplanung: extern über Cron; jeder Aufruf prüft einmal und beendet sich.
                     Weitere Einstellungen: README.md

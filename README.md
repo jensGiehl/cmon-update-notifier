@@ -23,7 +23,7 @@ einer **dateibasierten H2-Datenbank** gespeichert.
   Logging-Ausgabekanal. Erst ein späterer Wechsel eines bekannten Status oder Liefertermins
   löst eine Benachrichtigung aus. Die frühere Option `--monitor.notify-on-first-run` und
   `CMON_NOTIFY_ON_FIRST_RUN` werden nicht mehr ausgewertet.
-- Bei jedem erfolgreichen Seitenabruf werden **alle aktuellen Projektstatus auf INFO-Level
+- Bei jedem erfolgreichen Seitenabruf werden **alle relevanten Projektstatus auf INFO-Level
   protokolliert**, einschließlich Produktionsschritten, Liefertermin und Webseiten-Aktualisierungsdatum.
   Diese Statusausgabe erfolgt auch beim ersten Start und bei unveränderten Projekten.
 - H2 speichert die Abschnitte und Aktualisierungsdaten in `monitor_snapshot`, die
@@ -44,17 +44,69 @@ einer **dateibasierten H2-Datenbank** gespeichert.
 - Lange Telegram-Meldungen werden aufgeteilt; jeder Teil enthält den Webseitenlink.
   Projektnamen werden als Klartext versendet.
 
+## Interessante Titel auswählen
+
+Mit `monitor.interested-titles` lässt sich optional festlegen, welche Titel relevant sind.
+Nur diese Titel erscheinen in Änderungsmeldungen, im Sonntagsreport und in der regelmäßigen
+Statusausgabe im Log. Die Auswahl gilt für Crowdfunding und Pre-order. Verglichen werden
+vollständige Titel; Groß-/Kleinschreibung und Leerzeichen am Anfang oder Ende werden ignoriert.
+
+Ohne eigene Konfiguration sind folgende Titel voreingestellt:
+
+- The Dead Keep
+- Mordred
+- Masters of the Universe: The Board Game - Clash for Eternia
+- DCeased
+- Massive Darkness: Dungeons of Shadowreach
+
+Eine eigene, durch Kommas getrennte Liste ersetzt diese Vorgabe vollständig:
+
+```bash
+export CMON_INTERESTED_TITLES='Mordred,DCeased'
+java -jar target/cmon-update.jar
+```
+
+Alternativ direkt beim Aufruf:
+
+```bash
+java -jar target/cmon-update.jar --monitor.interested-titles='Mordred,DCeased'
+```
+
+**Eine ausdrücklich leere Liste berücksichtigt alle Titel**, auch neu hinzukommende:
+
+```bash
+export CMON_INTERESTED_TITLES=
+java -jar target/cmon-update.jar
+```
+
+Das funktioniert ebenso mit `--monitor.interested-titles=`. Leere Listeneinträge und reine
+Leerzeichen werden ignoriert. Eine nicht gesetzte Umgebungsvariable verwendet dagegen die
+fünf Standardtitel. Enthält eine nicht leere Auswahl keinen auf der Webseite vorhandenen
+Titel, werden keine Projektänderungen gemeldet; der Sonntagsreport bestätigt weiterhin die
+Aktivität, ohne Projekte aufzulisten.
+
+Für Cron kann die Einstellung in `/opt/cmon-update/telegram.env` gepflegt werden.
+Bei Verwendung von `run-java.sh` Werte mit Leerzeichen in einfache Anführungszeichen setzen,
+z. B. `CMON_INTERESTED_TITLES='The Dead Keep,Mordred'`. Für Docker `--env-file` dagegen ohne
+Anführungszeichen schreiben: `CMON_INTERESTED_TITLES=The Dead Keep,Mordred`.
+`CMON_INTERESTED_TITLES=` aktiviert in beiden Varianten alle Titel; ohne Eintrag gelten
+die Standardtitel aus dem Image bzw. der Anwendung.
+
+Die H2-Datenbank speichert weiterhin den vollständigen Seitenstand. Eine geänderte Auswahl
+erzeugt dadurch keine künstlichen Entfernungsmeldungen; beim Hinzufügen eines bereits
+bekannten Titels wird dessen zuletzt gespeicherter Stand für den nächsten Vergleich genutzt.
+
 ## Sonntägliche Aktivitätsmeldung
 
 Bei konfiguriertem Telegram versendet die Anwendung beim ersten erfolgreichen Seitenabruf
 am **Sonntag ab 10:00 Uhr in Europe/Berlin** eine zusätzliche Meldung, dass sie weiterhin
 aktiv ist. Sommer- und Winterzeit werden automatisch berücksichtigt. Die Meldung enthält
-für Crowdfunding und Pre-order alle Projekte mit mindestens einem Schritt `In progress`
+für Crowdfunding und Pre-order alle relevanten Projekte mit mindestens einem Schritt `In progress`
 und nennt sämtliche aktuell laufenden Schritte. Projekte ohne laufende Schritte werden
 nicht angezeigt. Projektnamen erscheinen **fett**, darunter stehen ausschließlich die
 laufenden Schritte. Crowdfunding und Pre-order erscheinen als eigene Abschnitte mit
 Überschrift und direktem Link zum jeweiligen Bereich der CMON-Seite. Auch bei Preorders
-erscheinen ausschließlich Projekte mit laufenden Schritten; abgeschlossene oder wartende
+erscheinen ausschließlich relevante Projekte mit laufenden Schritten; abgeschlossene oder wartende
 Preorders werden nicht aufgeführt. Abschnitte ohne aktive Projekte entfallen.
 Zwischen Projekten steht eine Leerzeile; Abschnittspräfixe wie `[Crowdfunding]` vor
 einzelnen Projektnamen entfallen. Sind keine Projekte in Arbeit, wird trotzdem eine kurze Aktivitätsmeldung
@@ -72,6 +124,9 @@ Pre-order<br>
 [Preorder-Projektstatus](https://www.cmon.com/project-status/#pre-order)<br>
 **Super Fantasy Brawl Reborn**<br>
 Art & Graphics, Molding, Proofing Files
+
+Dieses Beispiel setzt eine Auswahl voraus, die auch Super Fantasy Brawl Reborn enthält,
+oder eine leere Titelliste für alle Projekte.
 
 Telegram erhält die Fettschrift als Formatierungsinformation. Sonderzeichen und Emojis
 in Projektnamen bleiben erhalten. Bei langen Meldungen wird die Formatierung auch in
@@ -169,7 +224,9 @@ java -jar target/cmon-update.jar --help
 Die Tests prüfen Parser, Änderungen, Flyway-Migrationen für neue und vorhandene H2-Datenbanken,
 H2-Persistenz nach erneuten Aufrufen,
 Transaktions-Rollback, konkurrierende Prüfungen, die Sonntagsmeldung einschließlich
-Zeitgrenze, Sommer-/Winterzeit, Neustarts und Versandfehlern, Logging-Ausgaben ohne Telegram und die HTTP-Kommunikation über lokale
+Zeitgrenze, Sommer-/Winterzeit, Neustarts und Versandfehlern, Titelauswahl für Änderungen,
+Entfernungen, Reports und Logs, Standardtitel und leere Auswahllisten,
+Logging-Ausgaben ohne Telegram und die HTTP-Kommunikation über lokale
 Testendpunkte. Sie senden keine echten Telegram-Nachrichten.
 
 ## Telegram und Konfiguration
@@ -205,6 +262,7 @@ als Chat-ID verwendet werden, wenn der Bot die erforderlichen Rechte besitzt.
 | `TELEGRAM_CHAT_ID` | `--monitor.telegram.chat-id` | leer; für Telegram erforderlich |
 | `CMON_DATABASE_PATH` | `--monitor.database-path` | `./data/cmon-state`, im Docker-Image `/data/cmon-state` |
 | `CMON_REQUEST_TIMEOUT` | `--monitor.request-timeout` | `30s` |
+| `CMON_INTERESTED_TITLES` | `--monitor.interested-titles` | fünf Standardtitel wie oben; leer = alle Titel |
 | `CMON_PAGE_URL` | `--monitor.page-url` | `https://www.cmon.com/project-status/` |
 | `TELEGRAM_API_URL` | `--monitor.telegram.api-url` | `https://api.telegram.org/` |
 

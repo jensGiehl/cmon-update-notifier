@@ -5,6 +5,7 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.List;
 import java.util.Objects;
 
 final class TestFixtures {
@@ -23,6 +24,6 @@ final class TestFixtures {
     static MonitorProperties properties(Path directory) {
         return new MonitorProperties(PAGE, directory.resolve("cmon-state"),
                 Duration.ofSeconds(5),
-                new MonitorProperties.Telegram("123:test-token", "123", URI.create("https://api.telegram.org/")));
+                new MonitorProperties.Telegram("123:test-token", "123", URI.create("https://api.telegram.org/")), List.of());
     }
 }

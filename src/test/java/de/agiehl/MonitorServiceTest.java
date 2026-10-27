@@ -21,6 +21,42 @@ class MonitorServiceTest {
     Path directory;
 
     @Test
+    void appliesSelectionToSundayReportInBothSections() throws Exception {
+        var configured = TestFixtures.properties(directory);
+        var properties = new MonitorProperties(configured.pageUrl(), configured.databasePath(),
+                configured.requestTimeout(), configured.telegram(), List.of("mordRED", "pre-order game"));
+        var document = Jsoup.parse(TestFixtures.html());
+        document.selectFirst("#crowdfunding tbody tr td:nth-child(2) img").attr("alt", "In progress");
+        var messages = new ArrayList<String>();
+
+        service(properties, new StateStore(properties), document::outerHtml, messages::add,
+                "2026-10-25T09:00:00Z").check();
+
+        assertThat(messages).singleElement().asString()
+                .contains("Crowdfunding\n", "Mordred\nShipping", "Pre-order\n", "Pre-order Game\nShipping")
+                .doesNotContain("Test & Spiel", "Development");
+    }
+
+    @Test
+    void confirmsActivityWithoutListingProjectsWhenNoTitleMatches() throws Exception {
+        var configured = TestFixtures.properties(directory);
+        var properties = new MonitorProperties(configured.pageUrl(), configured.databasePath(),
+                configured.requestTimeout(), configured.telegram(), List.of("Unknown title"));
+        var html = TestFixtures.html();
+        var messages = new ArrayList<String>();
+
+        service(properties, new StateStore(properties), () -> html, messages::add).check();
+        var changed = html.replace("2027 Q1", "2027 Q2");
+        service(properties, new StateStore(properties), () -> changed, messages::add,
+                "2026-10-25T09:00:00Z").check();
+
+        assertThat(messages).singleElement().asString().contains("weiterhin aktiv", "keine Projekte in progress")
+                .doesNotContain("Mordred", "Test & Spiel", "Pre-order Game");
+        assertThat(new StateStore(properties).load().get(Section.PRE_ORDER).projects().get("Pre-order Game"))
+                .containsEntry("Delivery", "2027 Q2");
+    }
+
+    @Test
     void initializesSilentlySurvivesRestartAndOnlySendsChangedSection() throws Exception {
         var properties = TestFixtures.properties(directory);
         var store = new StateStore(properties);
@@ -253,7 +289,7 @@ class MonitorServiceTest {
     void doesNotConsumeSundayNotificationWhenTelegramIsNotConfigured() throws Exception {
         var configured = TestFixtures.properties(directory);
         var properties = new MonitorProperties(configured.pageUrl(), configured.databasePath(),
-                configured.requestTimeout(), null);
+                configured.requestTimeout(), null, configured.interestedTitles());
         var html = TestFixtures.html();
         var messages = new ArrayList<String>();
 
